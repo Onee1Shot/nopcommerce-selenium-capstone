@@ -2,31 +2,28 @@ package cucumber.stepdefs;
 
 import io.cucumber.java.en.*;
 import io.cucumber.datatable.DataTable;
-import org.openqa.selenium.WebDriver;
-import pages.BasePage;
 import pages.RegistrationPage;
 
 import java.util.Map;
 import java.util.UUID;
 
 public class RegistrationSteps {
-    private WebDriver driver;
+
     private RegistrationPage reg;
 
     @And("I select gender {string}")
     public void i_select_gender(String gender) {
-        driver = BasePage.getDriver();
-        reg = (reg == null) ? new RegistrationPage(driver) : reg;
+        reg = (reg == null) ? new RegistrationPage() : reg;
         reg.selectGender(gender);
     }
 
     @And("I fill the registration form with:")
     public void i_fill_the_registration_form_with(DataTable table) {
-        driver = BasePage.getDriver();
-        reg = (reg == null) ? new RegistrationPage(driver) : reg;
+        reg = (reg == null) ? new RegistrationPage() : reg;
 
         Map<String, String> m = table.asMap(String.class, String.class);
 
+        // generate unique email (keeps domain, adds +tag)
         String email = m.getOrDefault("Email", "").trim();
         if (email.isEmpty() || !email.contains("@")) {
             email = "user+" + UUID.randomUUID().toString().substring(0,8) + "@example.com";
@@ -46,11 +43,13 @@ public class RegistrationSteps {
 
     @And("I submit the registration form")
     public void i_submit_the_registration_form() {
+        reg = (reg == null) ? new RegistrationPage() : reg;
         reg.clickRegister();
     }
 
     @Then("I should see {string}")
     public void i_should_see(String expected) {
+        reg = (reg == null) ? new RegistrationPage() : reg;
         String actual = reg.getResultMessage();
         if (actual == null) actual = "";
         if (!actual.contains(expected)) {

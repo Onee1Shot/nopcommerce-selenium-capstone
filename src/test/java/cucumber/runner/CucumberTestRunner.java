@@ -1,10 +1,5 @@
 package cucumber.runner;
 
-public class CucumberTestRunner {
-
-}
-package cucumber.runner;
-
 
 
 import io.cucumber.testng.AbstractTestNGCucumberTests;

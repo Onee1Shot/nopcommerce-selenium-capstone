@@ -1,176 +1,162 @@
 package pages;
 
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
+import io.github.bonigarcia.wdm.WebDriverManager;
+import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.edge.EdgeDriver;
+import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
-// add this import at the top:
-import org.openqa.selenium.By;
 
 import java.time.Duration;
 import java.util.List;
 
-public class BasePage {
-	protected static WebDriver driver;
-	protected static WebDriverWait wait;
-	private static String baseUrl;
+public abstract class BasePage {
 
-	// Initialize driver and base URL
-	public static void initializeDriver(String url) {
-		if (driver == null) {
-			driver = new ChromeDriver();
-			driver.manage().window().maximize();
-			wait = new WebDriverWait(driver, Duration.ofSeconds(10));
-			baseUrl = url;
-		}
-	}
-//	public static int getCartCount() {
-//	    try {
-//	        String qty = driver.findElement(By.cssSelector("span.cart-qty")).getText(); // e.g. "(1)"
-//	        String digits = qty.replaceAll("[^0-9]", "");
-//	        return digits.isEmpty() ? 0 : Integer.parseInt(digits);
-//	    } catch (Exception e) {
-//	        return 0;
-//	    }
-//	}
+    private static WebDriver DRIVER;
+    private static WebDriverWait WAIT;
 
-	// Get WebDriver
-	public static WebDriver getDriver() {
-		return driver;
-	}
+    public static WebDriver initializeDriver(String browser) {
+        if (DRIVER != null) return DRIVER;
 
-	// Get WebDriverWait
-	public static WebDriverWait getWait() {
-		return wait;
-	}
+        String b = browser == null ? "chrome" : browser.trim().toLowerCase();
+        boolean headless = Boolean.parseBoolean(System.getProperty("headless", "false"));
 
-	// Get Base URL
-	public static String getBaseUrl() {
-		return baseUrl;
-	}
+        switch (b) {
+            case "edge" -> {
+                WebDriverManager.edgedriver().setup();
+                DRIVER = new EdgeDriver();
+            }
+            case "firefox" -> {
+                WebDriverManager.firefoxdriver().setup();
+                DRIVER = new FirefoxDriver();
+            }
+            default -> {
+                WebDriverManager.chromedriver().setup();
+                ChromeOptions opts = new ChromeOptions();
+                opts.addArguments("--disable-notifications", "--disable-infobars", "--start-maximized");
+                if (headless) opts.addArguments("--headless=new");
+                DRIVER = new ChromeDriver(opts);
+            }
+        }
+        attach(DRIVER, Duration.ofSeconds(20));
+        return DRIVER;
+    }
 
-//    public static void clickHeaderLink(String linkText) {
-//        driver.findElement(By.linkText(linkText)).click();
-//    }
-	public static void clickHeaderLink(String label) {
-		String key = label == null ? "" : label.trim().toLowerCase();
+    public static void quitDriver() {
+        try {
+            if (DRIVER != null) DRIVER.quit();
+        } catch (Exception ignore) { }
+        DRIVER = null;
+        WAIT = null;
+    }
 
-		// Prefer stable header icon classes; fall back to visible text
-		By locator;
-		switch (key) {
-		case "login":
-		case "log in":
-			locator = By.cssSelector("a.ico-login");
-			break;
-		case "logout":
-		case "log out":
-			locator = By.cssSelector("a.ico-logout");
-			break;
-		case "register":
-			locator = By.cssSelector("a.ico-register");
-			break;
-		case "my account":
-			locator = By.cssSelector("a.ico-account");
-			break;
-		case "wishlist":
-			locator = By.cssSelector("a.ico-wishlist");
-			break;
-		case "shopping cart":
-			locator = By.cssSelector("a.ico-cart");
-			break;
-		default:
-			// fallback to the literal text you passed in
-			locator = By.linkText(label);
-		}
+    public static void attach(WebDriver driver, Duration timeout) {
+        DRIVER = driver;
+        WAIT = new WebDriverWait(driver, timeout == null ? Duration.ofSeconds(20) : timeout);
+        WAIT.ignoring(StaleElementReferenceException.class);
+    }
 
-		WebElement el = getWait().until(ExpectedConditions.elementToBeClickable(locator));
-		el.click();
+    public static WebDriver getDriver() { return DRIVER; }
 
-		// If someone passed "Login" (no space) but the site uses "Log in",
-		// the css selector above already handled it. If the default path ran,
-		// add a soft fallback to the actual link text.
-		if (key.equals("login")) {
-			try {
-				getWait().until(ExpectedConditions.elementToBeClickable(By.linkText("Log in"))).click();
-			} catch (Exception ignored) {
-			}
-		} else if (key.equals("logout")) {
-			try {
-				getWait().until(ExpectedConditions.elementToBeClickable(By.linkText("Log out"))).click();
-			} catch (Exception ignored) {
-			}
-		}
-	}
-	
-	public static void emptyCartIfAny() {
-	    try {
-	        // If cart is already empty, nothing to do
-	        if (getCartCount() == 0) return;
+    public static WebDriverWait getWait() {
+        if (WAIT == null) WAIT = new WebDriverWait(DRIVER, Duration.ofSeconds(20));
+        return WAIT;
+    }
 
-	        // Open cart page
-	        getWait().until(ExpectedConditions.elementToBeClickable(By.cssSelector("a.ico-cart"))).click();
+    public static void clickHeaderLink(String visibleText) {
+        By link = By.linkText(visibleText);
+        getWait().until(ExpectedConditions.elementToBeClickable(link)).click();
+    }
 
-	        // Try the standard remove checkboxes
-	        List<WebElement> removeBoxes = getDriver().findElements(By.cssSelector("input.remove-from-cart"));
-	        if (!removeBoxes.isEmpty()) {
-	            for (WebElement cb : removeBoxes) {
-	                if (!cb.isSelected()) cb.click();
-	            }
-	            getDriver().findElement(By.name("updatecart")).click();
-	        } else {
-	            // Fallback: set quantities to 0 then update
-	            List<WebElement> qtyInputs = getDriver().findElements(By.cssSelector("input.qty-input"));
-	            if (!qtyInputs.isEmpty()) {
-	                for (WebElement q : qtyInputs) { q.clear(); q.sendKeys("0"); }
-	                getDriver().findElement(By.name("updatecart")).click();
-	            }
-	        }
+    public static int getCartCount() {
+        try {
+            String[] selectors = new String[]{
+                    "a.ico-cart .cart-qty", ".header-links .cart-qty", ".header .cart-qty", ".shopping-cart-link .cart-qty"
+            };
+            for (String css : selectors) {
+                List<WebElement> els = DRIVER.findElements(By.cssSelector(css));
+                if (!els.isEmpty() && els.get(0).isDisplayed()) {
+                    String t = els.get(0).getText();
+                    if (t == null || t.isBlank()) continue;
+                    String digits = t.replaceAll("\\D+", "");
+                    if (!digits.isEmpty()) return Integer.parseInt(digits);
+                }
+            }
+        } catch (Exception ignored) {}
+        return 0;
+    }
 
-	        // Wait until the header badge shows 0
-	        getWait().until(d -> getCartCount() == 0);
+    public static boolean isSuccessBarVisible() {
+        try {
+            List<WebElement> ok = DRIVER.findElements(By.cssSelector(".bar-notification.success"));
+            return !ok.isEmpty() && ok.get(0).isDisplayed();
+        } catch (Exception e) { return false; }
+    }
 
-	        // Go back to homepage (logo click or direct URL)
-	        try {
-	            getDriver().findElement(By.cssSelector("img[alt*='nopCommerce']")).click();
-	        } catch (Exception e) {
-	            getDriver().get(getBaseUrl());
-	        }
-	    } catch (Exception ignore) { /* keep tests flowing even if cart already empty */ }
-	}
+    public static void waitForCartCountToIncreaseOrSuccess(int before) {
+        getWait().until(d -> {
+            int now = getCartCount();
+            if (now > before) return true;
+            if (isSuccessBarVisible()) return true;
+            List<WebElement> fly = d.findElements(By.cssSelector(".mini-shopping-cart, .flyout-cart"));
+            return !fly.isEmpty() && fly.get(0).isDisplayed();
+        });
+    }
 
-	// --- Cart Helpers ---
+    public static void openCartPage() {
+        clickHeaderLink("Shopping cart");
+        getWait().until(ExpectedConditions.visibilityOfElementLocated(
+                By.cssSelector(".order-summary-content, .cart")));
+    }
 
-	/** Reads the cart quantity badge (top-right link "Shopping cart (X)") */
-	public static int getCartCount() {
-	    try {
-	        WebElement cartLink = getDriver().findElement(By.cssSelector("a.ico-cart"));
-	        String txt = cartLink.getText();  // e.g. "Shopping cart (2)"
-	        if (txt != null && txt.contains("(") && txt.contains(")")) {
-	            String inside = txt.substring(txt.indexOf("(") + 1, txt.indexOf(")")).trim();
-	            return Integer.parseInt(inside);
-	        }
-	    } catch (Exception e) {
-	        // fallback if badge missing or not parsable
-	    }
-	    return 0;
-	}
+    public static void emptyCartIfAny() {
+        openCartPage();
+        List<WebElement> rows = getDriver().findElements(
+                By.cssSelector(".cart tbody tr, .order-summary-content .cart-item-row, .table-wrapper tbody tr"));
+        if (rows.isEmpty()) return;
 
-	/** Wait until the cart count increases compared to previous value */
-	public static void waitForCartCountToIncrease(int before) {
-	    getWait().until(driver -> {
-	        int now = getCartCount();
-	        return now > before;
-	    });
-	}
+        List<WebElement> removeChecks = getDriver().findElements(By.cssSelector("input[name='removefromcart']"));
+        if (!removeChecks.isEmpty()) {
+            for (WebElement c : removeChecks) {
+                try { if (!c.isSelected()) c.click(); } catch (Exception ignore) {}
+            }
+            By update = By.cssSelector("button[name='updatecart'], input[name='updatecart'], .update-cart-button");
+            getWait().until(ExpectedConditions.elementToBeClickable(update)).click();
+        } else {
+            By removeBtn = By.cssSelector(".remove-btn, button.remove-btn, .cart .remove-product");
+            while (true) {
+                List<WebElement> btns = getDriver().findElements(removeBtn);
+                if (btns.isEmpty()) break;
+                int before = btns.size();
+                try { btns.get(0).click(); } catch (Exception ignore) {}
+                getWait().until(d -> d.findElements(removeBtn).size() < before);
+            }
+        }
 
-	// Quit driver
-	public static void quitDriver() {
-		if (driver != null) {
-			driver.quit();
-			driver = null;
-			wait = null;
-			baseUrl = null;
-		}
-	}
+        getWait().until(d ->
+                getCartCount() == 0 ||
+                !d.findElements(By.cssSelector(".order-summary-content .no-data, .cart-empty, .page-body .no-data")).isEmpty()
+        );
+        closeSuccessBarIfPresent();
+    }
+
+    public static void acceptAlertIfPresent() {
+        try {
+            getWait().withTimeout(Duration.ofSeconds(2))
+                    .until(ExpectedConditions.alertIsPresent())
+                    .accept();
+        } catch (Exception ignore) {}
+    }
+
+    public static void closeSuccessBarIfPresent() {
+        try {
+            WebElement success = DRIVER.findElement(By.cssSelector(".bar-notification.success"));
+            List<WebElement> close = success.findElements(By.cssSelector(".close"));
+            if (!close.isEmpty()) close.get(0).click();
+        } catch (Exception ignore) {}
+    }
+
+    public static String getBaseUrl() { return "https://demo.nopcommerce.com/"; }
 }
