@@ -18,7 +18,7 @@ public class RegistrationPage extends BasePage {
     // Success text on nopCommerce after successful registration
     private final By resultMsg = By.cssSelector(".result, .page-body .result, .registration-result");
 
-    // Optional: keep a ctor with WebDriver for legacy code (ignored internally)
+
     public RegistrationPage() {}
     public RegistrationPage(org.openqa.selenium.WebDriver ignored) {}
 
